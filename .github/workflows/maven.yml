@@ -1,17 +1,70 @@
 
-FROM maven:3.9.9-eclipse-temurin-17 AS build
+name: EvenOdd Maven CI/CD Pipeline
 
-WORKDIR /app
+# Trigger workflow on push and pull requests
+on:
+  push:
+    branches: ["main"]
 
-COPY pom.xml .
-COPY src ./src
+  pull_request:
+    branches: ["main"]
 
-RUN mvn clean test
+jobs:
 
-FROM eclipse-temurin:17-jre
+  # JOB 1: Run Maven TestNG Tests
+  test:
+    name: Run Even-Odd Tests
+    runs-on: ubuntu-latest
 
-WORKDIR /app
+    steps:
+      # Step 1: Checkout source code
+      - name: Checkout source code
+        uses: actions/checkout@v4
 
-COPY --from=build /app/target/classes ./classes
+      # Step 2: Set up JDK 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: maven
 
-CMD ["java", "-cp", "classes", "com.example.vvce.evenodd.App"]
+      # Step 3: Run Maven tests
+      - name: Run Maven TestNG Tests
+        run: mvn clean test
+
+  # JOB 2: Build and Push Docker Image
+  build-and-push:
+    name: Build and Push Docker Image
+    needs: test
+    runs-on: ubuntu-latest
+
+    # Push Docker image only on push events
+    if: github.event_name == 'push'
+
+    steps:
+      # Step 1: Checkout source code
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # Step 2: Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Step 3: Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Step 4: Build and Push Docker Image
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/practice:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/practice:${{ github.sha }}
