@@ -30,16 +30,22 @@ FROM maven:3.9.9-eclipse-temurin-17
 
 WORKDIR /app
 
-# Install Chromium
-RUN apt-get update && apt-get install -y \
+# Update package lists and install Chromium
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     chromium \
-    && rm -rf /var/lib/apt/lists/*
+    chromium-driver && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy project files from build stage
+# Copy project files
 COPY --from=build /app /app
+
+# Copy Maven dependencies
+COPY --from=build /root/.m2 /root/.m2
 
 # Chromium configuration
 ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER=/usr/bin/chromedriver
 
-# Execute Selenium tests
+# Run Selenium TestNG tests
 CMD ["mvn", "test"]
