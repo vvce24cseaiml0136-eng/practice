@@ -1,77 +1,17 @@
 
-name: Selenium TestNG CI/CD Pipeline
+FROM maven:3.9.9-eclipse-temurin-17 AS build
 
-# Trigger workflow on push and pull requests to main
-on:
-  push:
-    branches: ["main"]
+WORKDIR /app
 
-  pull_request:
-    branches: ["main"]
+COPY pom.xml .
+COPY src ./src
 
-jobs:
+RUN mvn clean test
 
-  # JOB 1: Execute Selenium TestNG Automation Tests
-  selenium-test:
-    runs-on: ubuntu-latest
+FROM eclipse-temurin:17-jre
 
-    steps:
-      # Step 1: Checkout source code
-      - name: Checkout source code
-        uses: actions/checkout@v4
+WORKDIR /app
 
-      # Step 2: Set up JDK 17
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: maven
+COPY --from=build /app/target/classes ./classes
 
-      # Step 3: Set up Chrome
-      - name: Set up Chrome
-        uses: browser-actions/setup-chrome@v1
-
-      # Step 4: Verify Java and Chrome
-      - name: Verify Java and Chrome
-        run: |
-          java -version
-          google-chrome --version
-
-      # Step 5: Run Selenium tests
-      - name: Run Selenium tests
-        run: mvn clean test
-
-
-  # JOB 2: Build and Publish Docker Image
- 
-  # JOB 2: Build and Publish Docker Image
-  build-and-publish-docker:
-    needs: selenium-test
-    runs-on: ubuntu-latest
-
-    if: github.event_name == 'push'
-
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/practice:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/practice:${{ github.sha }}
-
+CMD ["java", "-cp", "classes", "com.example.vvce.evenodd.App"]
